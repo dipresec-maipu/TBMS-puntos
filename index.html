@@ -1,0 +1,981 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Registro de Puntos de Intervención TBMS 2026</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    :root {
+      --azul: #252C54;
+      --magenta: #E60380;
+      --celeste: #31CCEC;
+      --amarillo: #FFB71B;
+      --gris: #f5f6fa;
+      --borde: #d7d9e2;
+      --texto: #222;
+      --verde: #0f8b4c;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background: var(--gris);
+      color: var(--texto);
+    }
+
+    header {
+      background: var(--azul);
+      color: white;
+      padding: 18px 24px;
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 22px;
+    }
+
+    header p {
+      margin: 6px 0 0;
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 8px;
+      padding: 12px 16px 0;
+      background: var(--gris);
+    }
+
+    .tab-btn {
+      border: 1px solid var(--borde);
+      background: white;
+      color: var(--azul);
+      padding: 11px 16px;
+      border-radius: 12px 12px 0 0;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .tab-btn.active {
+      background: var(--azul);
+      color: white;
+      border-color: var(--azul);
+    }
+
+    main { padding: 16px; }
+
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 390px 1fr;
+      gap: 16px;
+      min-height: calc(100vh - 150px);
+    }
+
+    .panel, .mapa-panel, .tabla-panel {
+      background: white;
+      border-radius: 14px;
+      box-shadow: 0 4px 18px rgba(0, 0, 0, 0.08);
+      border: 1px solid var(--borde);
+    }
+
+    .panel {
+      padding: 16px;
+      overflow-y: auto;
+      max-height: calc(100vh - 170px);
+    }
+
+    .panel h2, .tabla-panel h2 {
+      font-size: 17px;
+      margin: 0 0 12px;
+      color: var(--azul);
+    }
+
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: bold;
+      margin: 12px 0 5px;
+      color: var(--azul);
+    }
+
+    select, input {
+      width: 100%;
+      border: 1px solid var(--borde);
+      border-radius: 9px;
+      padding: 9px 10px;
+      font-size: 14px;
+      background: white;
+    }
+
+    .dato-card {
+      background: #fafafa;
+      border: 1px solid var(--borde);
+      border-radius: 12px;
+      padding: 12px;
+      margin-top: 14px;
+    }
+
+    .dato-card p {
+      margin: 5px 0;
+      font-size: 13px;
+      line-height: 1.35;
+    }
+
+    .dato-card strong { color: var(--azul); }
+
+    .contador {
+      margin-top: 12px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: #eef8fb;
+      border-left: 5px solid var(--celeste);
+      font-size: 14px;
+    }
+
+    .resumen-revision {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .estado {
+      margin-top: 12px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      font-size: 13px;
+      display: none;
+    }
+
+    .estado.ok { display: block; background: #e9f8f0; border-left: 5px solid var(--verde); }
+    .estado.error { display: block; background: #fdecef; border-left: 5px solid var(--magenta); }
+    .estado.info { display: block; background: #eef8fb; border-left: 5px solid var(--celeste); }
+
+    .botones {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    button {
+      border: none;
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-weight: bold;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    .btn-secundario { background: var(--azul); color: white; }
+    .btn-alerta { background: var(--amarillo); color: #222; }
+    .btn-gris { background: #e8e9ef; color: #222; }
+    .btn-verde { background: var(--verde); color: white; }
+    button:disabled { opacity: 0.55; cursor: not-allowed; }
+
+    .mapa-panel {
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      overflow: hidden;
+    }
+
+    .buscador-mapa {
+      display: grid;
+      grid-template-columns: 1fr 110px;
+      gap: 8px;
+      padding: 12px;
+      border-bottom: 1px solid var(--borde);
+      background: #fff;
+    }
+
+    #mapRegistro, #mapRevision {
+      min-height: 560px;
+      width: 100%;
+    }
+
+    .ayuda-mapa {
+      padding: 10px 14px;
+      font-size: 13px;
+      border-top: 1px solid var(--borde);
+      background: #fff;
+    }
+
+    .tabla-panel {
+      margin-top: 16px;
+      padding: 16px;
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    th {
+      background: var(--azul);
+      color: white;
+      padding: 8px;
+      text-align: left;
+      white-space: nowrap;
+    }
+
+    td {
+      border-bottom: 1px solid var(--borde);
+      padding: 8px;
+      vertical-align: top;
+    }
+
+    .badge {
+      display: inline-block;
+      background: var(--magenta);
+      color: white;
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 12px;
+      font-weight: bold;
+    }
+
+    .fila-vacia {
+      text-align: center;
+      color: #666;
+      padding: 18px;
+    }
+
+    .nota {
+      font-size: 12px;
+      color: #555;
+      line-height: 1.35;
+      margin-top: 10px;
+    }
+
+    @media (max-width: 900px) {
+      .layout { grid-template-columns: 1fr; }
+      .panel { max-height: none; }
+      #mapRegistro, #mapRevision { min-height: 420px; }
+      .tabs { flex-direction: column; }
+      .tab-btn { border-radius: 12px; }
+      .buscador-mapa { grid-template-columns: 1fr; }
+      .resumen-revision { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Registro de Puntos de Intervención TBMS 2026</h1>
+    <p>Seleccione una organización, marque sus puntos en el mapa y guarde los registros en una base central.</p>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab-btn active" data-tab="registrar">Registrar puntos</button>
+    <button class="tab-btn" data-tab="revisar">Revisar puntos registrados</button>
+  </nav>
+
+  <main>
+    <section id="registrar" class="tab-content active">
+      <div class="layout">
+        <section class="panel">
+          <h2>1. Datos del proyecto</h2>
+
+          <label for="barrioFiltroRegistro">Filtrar por barrio</label>
+          <select id="barrioFiltroRegistro">
+            <option value="">Todos los barrios</option>
+          </select>
+
+          <label for="organizacionSelectRegistro">Organización</label>
+          <select id="organizacionSelectRegistro">
+            <option value="">Seleccione una organización</option>
+          </select>
+
+          <div id="datosOrganizacion" class="dato-card">
+            <p><strong>Folio:</strong> —</p>
+            <p><strong>Organización:</strong> —</p>
+            <p><strong>Tipología:</strong> —</p>
+            <p><strong>Barrio:</strong> —</p>
+            <p><strong>Proyecto:</strong> —</p>
+          </div>
+
+          <div class="contador">
+            Puntos pendientes: <strong id="contadorPuntos">0</strong> / 10
+          </div>
+
+          <div class="botones">
+            <button class="btn-alerta" id="btnEliminarUltimo">Eliminar último</button>
+            <button class="btn-gris" id="btnLimpiar">Limpiar todo</button>
+            <button class="btn-secundario" id="btnCentrarRegistro">Centrar Maipú</button>
+            <button class="btn-verde" id="btnGuardar">Guardar</button>
+          </div>
+
+          <div id="estadoRegistro" class="estado"></div>
+
+          <p class="nota">
+            Modo de uso: seleccione la organización y haga clic directamente en el mapa para marcar cada punto de intervención.
+          </p>
+        </section>
+
+        <section class="mapa-panel">
+          <div class="buscador-mapa">
+            <input id="direccionRegistro" type="text" placeholder="Buscar dirección o intersección en Maipú" />
+            <button class="btn-secundario" id="btnBuscarRegistro">Buscar</button>
+          </div>
+          <div id="mapRegistro"></div>
+          <div class="ayuda-mapa">
+            Instrucción: seleccione una organización y luego haga clic en el mapa para agregar cada punto. Cada clic queda pendiente hasta presionar “Guardar”.
+          </div>
+        </section>
+      </div>
+
+      <section class="tabla-panel">
+        <h2>2. Puntos pendientes de guardar</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>N°</th>
+              <th>Folio</th>
+              <th>Organización</th>
+              <th>Tipología</th>
+              <th>Barrio</th>
+              <th>Proyecto</th>
+              <th>Latitud</th>
+              <th>Longitud</th>
+            </tr>
+          </thead>
+          <tbody id="tablaPuntosPendientes">
+            <tr><td class="fila-vacia" colspan="8">Aún no hay puntos pendientes.</td></tr>
+          </tbody>
+        </table>
+      </section>
+    </section>
+
+    <section id="revisar" class="tab-content">
+      <div class="layout">
+        <section class="panel">
+          <h2>Filtros de revisión</h2>
+
+          <label for="barrioFiltroRevision">Barrio</label>
+          <select id="barrioFiltroRevision">
+            <option value="">Todos los barrios</option>
+          </select>
+
+          <label for="tipologiaFiltroRevision">Tipología</label>
+          <select id="tipologiaFiltroRevision">
+            <option value="">Todas las tipologías</option>
+          </select>
+
+          <label for="organizacionFiltroRevision">Organización</label>
+          <select id="organizacionFiltroRevision">
+            <option value="">Todas las organizaciones</option>
+          </select>
+
+          <div class="resumen-revision">
+            <div class="contador">
+              Puntos visibles: <strong id="contadorRevision">0</strong>
+            </div>
+            <div class="contador">
+              Proyectos visibles: <strong id="contadorProyectosRevision">0</strong>
+            </div>
+          </div>
+
+          <div class="botones">
+            <button class="btn-secundario" id="btnActualizarRevision">Actualizar datos</button>
+            <button class="btn-gris" id="btnCentrarRevision">Centrar Maipú</button>
+          </div>
+
+          <div id="estadoRevision" class="estado"></div>
+
+          <p class="nota">
+            Esta pestaña permite revisar los puntos ya registrados, filtrando por barrio, tipología u organización.
+          </p>
+        </section>
+
+        <section class="mapa-panel">
+          <div class="buscador-mapa">
+            <input id="direccionRevision" type="text" placeholder="Buscar dirección o intersección en Maipú" />
+            <button class="btn-secundario" id="btnBuscarRevision">Buscar</button>
+          </div>
+          <div id="mapRevision"></div>
+          <div class="ayuda-mapa">
+            Los puntos guardados se muestran en este mapa. Puede filtrar por barrio, tipología u organización.
+          </div>
+        </section>
+      </div>
+
+      <section class="tabla-panel">
+        <h2>Puntos registrados en la base</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>N°</th>
+              <th>Folio</th>
+              <th>Organización</th>
+              <th>Tipología</th>
+              <th>Barrio</th>
+              <th>Proyecto</th>
+              <th>Latitud</th>
+              <th>Longitud</th>
+            </tr>
+          </thead>
+          <tbody id="tablaPuntosRegistrados">
+            <tr><td class="fila-vacia" colspan="9">Aún no hay puntos cargados.</td></tr>
+          </tbody>
+        </table>
+      </section>
+    </section>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    /*
+      PASO OBLIGATORIO:
+      Pegue aquí la URL de la implementación web de Apps Script.
+
+      Ejemplo:
+      const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxxxxxxxxxxxxxxxxxxxx/exec";
+    */
+    const SCRIPT_URL = "";
+
+    const BARRIOS_TBMS = [
+      "CIUDAD SATELITE",
+      "CLOTARIO BLEST",
+      "EL ABRAZO DE MAIPU",
+      "ESQUINA BLANCA - CUATRO ALAMOS",
+      "HOSPITAL-CAMPOS DE BATALLA",
+      "INDUSTRIAL",
+      "LA FARFANA",
+      "LO ERRAZURIZ",
+      "LONGITUDINAL",
+      "LOS BOSQUINOS",
+      "LOS HEROES",
+      "MAIPU CENTRO",
+      "PAJARITOS SUR",
+      "PARQUE TRES PONIENTE",
+      "PEHUEN",
+      "PORTAL DEL SOL",
+      "RIESCO-CENTRAL",
+      "RINCONADA RURAL",
+      "SANTA ANA DE CHENA",
+      "SOL PONIENTE",
+      "TEMPLO VOTIVO"
+    ];
+
+    const TIPOLOGIAS_TBMS = [
+      "Sistemas de Alarmas Comunitarias (AC)",
+      "Recambio Luminaria Pública (RL)",
+      "Luminaria Solar LED (LS)",
+      "Sistema de Teleprotección (STP)",
+      "Seguridad Vial (SV)"
+    ];
+
+    const ALIAS_BARRIOS = {
+      "EL ABRAZO": "EL ABRAZO DE MAIPU",
+      "ESQUINA BLANCA-CUATRO ALAMOS": "ESQUINA BLANCA - CUATRO ALAMOS",
+      "HOSPITAL - CAMPOS DE BATALLA": "HOSPITAL-CAMPOS DE BATALLA",
+      "RIESCO CENTRAL": "RIESCO-CENTRAL"
+    };
+
+    const ORGANIZACIONES_DEMO = [
+      { folio: "33063", organizacion: "AGRUPACION ANIMALISTA PANCHITO DE ASIS", barrio: "PORTAL DEL SOL", tipologia: "Sistema de Teleprotección (STP)", proyecto: "Proyecto de seguridad comunitaria" },
+      { folio: "33269", organizacion: "AGRUPACION APRENDE A VIVIR TEA Y TGD", barrio: "PORTAL DEL SOL", tipologia: "Sistemas de Alarmas Comunitarias (AC)", proyecto: "Proyecto de seguridad comunitaria" },
+      { folio: "36772", organizacion: "CLUB ADULTO MAYOR JUVENTUD DE AVANZADA", barrio: "CIUDAD SATELITE", tipologia: "Recambio Luminaria Pública (RL)", proyecto: "Proyecto de seguridad comunitaria" },
+      { folio: "37193", organizacion: "AGRUPACION CULTURAL DEPORTIVA SOCIAL DE SEGURIDAD Y SALUD GUATITAS DE DELANTAL MAIPU", barrio: "LOS HEROES", tipologia: "Seguridad Vial (SV)", proyecto: "Proyecto de seguridad comunitaria" },
+      { folio: "36923", organizacion: "AGRUPACION CULTURAL SOCIAL AMBIENTAL Y DEPORTIVA MAFULN EL ALTO MAIPU", barrio: "RIESCO CENTRAL", tipologia: "Luminaria Solar LED (LS)", proyecto: "Proyecto de seguridad comunitaria" }
+    ];
+
+    let organizaciones = [];
+    let puntosPendientes = [];
+    let puntosRegistrados = [];
+    let organizacionSeleccionada = null;
+    let markersPendientes = [];
+    let markersRevision = [];
+    let markerBusquedaRegistro = null;
+    let markerBusquedaRevision = null;
+
+    const centroMaipu = [-33.5102, -70.7565];
+    const zoomInicialMaipu = 13;
+
+    const mapRegistro = L.map("mapRegistro").setView(centroMaipu, zoomInicialMaipu);
+    const mapRevision = L.map("mapRevision").setView(centroMaipu, zoomInicialMaipu);
+
+    [mapRegistro, mapRevision].forEach(map => {
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution: "&copy; OpenStreetMap contributors"
+      }).addTo(map);
+    });
+
+    const barrioFiltroRegistro = document.getElementById("barrioFiltroRegistro");
+    const organizacionSelectRegistro = document.getElementById("organizacionSelectRegistro");
+    const datosOrganizacion = document.getElementById("datosOrganizacion");
+    const contadorPuntos = document.getElementById("contadorPuntos");
+    const tablaPuntosPendientes = document.getElementById("tablaPuntosPendientes");
+    const estadoRegistro = document.getElementById("estadoRegistro");
+
+    const barrioFiltroRevision = document.getElementById("barrioFiltroRevision");
+    const tipologiaFiltroRevision = document.getElementById("tipologiaFiltroRevision");
+    const organizacionFiltroRevision = document.getElementById("organizacionFiltroRevision");
+    const contadorRevision = document.getElementById("contadorRevision");
+    const contadorProyectosRevision = document.getElementById("contadorProyectosRevision");
+    const tablaPuntosRegistrados = document.getElementById("tablaPuntosRegistrados");
+    const estadoRevision = document.getElementById("estadoRevision");
+
+    async function iniciarApp() {
+      await cargarOrganizaciones();
+      await cargarPuntosRegistrados();
+      inicializarFiltrosRegistro();
+      inicializarFiltrosRevision();
+      cargarOrganizacionesRegistro();
+      renderDatosOrganizacion();
+      renderTablaPendientes();
+      renderRevision();
+      mapRegistro.setView(centroMaipu, zoomInicialMaipu);
+      mapRevision.setView(centroMaipu, zoomInicialMaipu);
+    }
+
+    function jsonpRequest(mode) {
+      return new Promise((resolve, reject) => {
+        if (!SCRIPT_URL) {
+          reject(new Error("SCRIPT_URL no configurada"));
+          return;
+        }
+
+        const callbackName = "jsonp_tbms_" + Date.now() + "_" + Math.floor(Math.random() * 100000);
+        const script = document.createElement("script");
+        const separador = SCRIPT_URL.includes("?") ? "&" : "?";
+        script.src = `${SCRIPT_URL}${separador}mode=${encodeURIComponent(mode)}&callback=${callbackName}&_=${Date.now()}`;
+
+        window[callbackName] = (data) => {
+          resolve(data);
+          delete window[callbackName];
+          script.remove();
+        };
+
+        script.onerror = () => {
+          reject(new Error("No se pudo conectar con Apps Script"));
+          delete window[callbackName];
+          script.remove();
+        };
+
+        document.body.appendChild(script);
+      });
+    }
+
+    async function cargarOrganizaciones() {
+      if (!SCRIPT_URL) {
+        organizaciones = normalizarOrganizaciones(ORGANIZACIONES_DEMO);
+        mostrarEstado(estadoRegistro, "info", "Modo demostración: falta pegar la URL de Apps Script en SCRIPT_URL.");
+        return;
+      }
+
+      try {
+        const data = await jsonpRequest("organizaciones");
+        organizaciones = normalizarOrganizaciones(data.organizaciones || []);
+        mostrarEstado(estadoRegistro, "ok", `Organizaciones cargadas: ${organizaciones.length}.`);
+      } catch (error) {
+        organizaciones = normalizarOrganizaciones(ORGANIZACIONES_DEMO);
+        mostrarEstado(estadoRegistro, "error", "No se pudieron cargar las organizaciones desde Sheets. Se usará base demo.");
+      }
+    }
+
+    async function cargarPuntosRegistrados() {
+      if (!SCRIPT_URL) {
+        renderRevision();
+        return;
+      }
+
+      try {
+        mostrarEstado(estadoRevision, "info", "Actualizando puntos registrados...");
+        const data = await jsonpRequest("puntos");
+        puntosRegistrados = normalizarPuntos(data.puntos || []);
+        mostrarEstado(estadoRevision, "ok", `Se cargaron ${puntosRegistrados.length} puntos registrados.`);
+      } catch (error) {
+        mostrarEstado(estadoRevision, "error", "No se pudieron cargar los puntos registrados desde Sheets.");
+      }
+    }
+
+    function normalizarOrganizaciones(lista) {
+      return lista.map(item => ({
+        folio: String(item.folio ?? item.Folio ?? item.FOLIO ?? "").trim(),
+        organizacion: String(item.organizacion ?? item["Organización"] ?? item.Organizacion ?? item.ORGANIZACION ?? "").trim(),
+        rut: String(item.rut ?? item.RUT ?? "").trim(),
+        barrio: normalizarBarrio(item.barrio ?? item.Barrio ?? item.BARRIO ?? ""),
+        tipologia: normalizarTipologia(item.tipologia ?? item["Tipología"] ?? item.Tipologia ?? item.TIPOLOGIA ?? ""),
+        proyecto: String(item.proyecto ?? item.Proyecto ?? item.PROYECTO ?? "").trim()
+      })).filter(item => item.folio && item.organizacion);
+    }
+
+    function normalizarPuntos(lista) {
+      return lista.map(item => ({
+        ...item,
+        folio: String(item.folio ?? item.Folio ?? item.FOLIO ?? "").trim(),
+        organizacion: String(item.organizacion ?? item["Organización"] ?? item.Organizacion ?? item.ORGANIZACION ?? "").trim(),
+        barrio: normalizarBarrio(item.barrio ?? item.Barrio ?? item.BARRIO ?? ""),
+        tipologia: normalizarTipologia(item.tipologia ?? item["Tipología"] ?? item.Tipologia ?? item.TIPOLOGIA ?? ""),
+        proyecto: String(item.proyecto ?? item.Proyecto ?? item.PROYECTO ?? "").trim(),
+        punto_numero: item.punto_numero ?? item.Punto ?? item["N°"] ?? item.numero ?? "",
+        latitud: Number(item.latitud ?? item.Latitud ?? item.LATITUD ?? 0),
+        longitud: Number(item.longitud ?? item.Longitud ?? item.LONGITUD ?? 0),
+        fecha_registro: item.fecha_registro ?? item.Fecha ?? item.FECHA ?? ""
+      }));
+    }
+
+    function normalizarBarrio(valor) {
+      const limpio = String(valor || "").trim().toUpperCase();
+      return ALIAS_BARRIOS[limpio] || limpio;
+    }
+
+    function normalizarTipologia(valor) {
+      const limpio = String(valor || "").trim();
+      if (!limpio) return "";
+      const upper = limpio.toUpperCase();
+      const encontrada = TIPOLOGIAS_TBMS.find(t => t.toUpperCase() === upper || t.toUpperCase().includes(upper));
+      return encontrada || limpio;
+    }
+
+    function inicializarFiltrosRegistro() {
+      llenarSelect(barrioFiltroRegistro, BARRIOS_TBMS, "Todos los barrios");
+    }
+
+    function inicializarFiltrosRevision() {
+      llenarSelect(barrioFiltroRevision, BARRIOS_TBMS, "Todos los barrios");
+      llenarSelect(tipologiaFiltroRevision, TIPOLOGIAS_TBMS, "Todas las tipologías");
+      llenarSelect(organizacionFiltroRevision, obtenerUnicos([...organizaciones, ...puntosRegistrados], "organizacion"), "Todas las organizaciones");
+    }
+
+    function llenarSelect(select, valores, placeholder) {
+      select.innerHTML = `<option value="">${placeholder}</option>`;
+      valores.forEach(valor => {
+        const opt = document.createElement("option");
+        opt.value = valor;
+        opt.textContent = valor;
+        select.appendChild(opt);
+      });
+    }
+
+    function obtenerUnicos(lista, campo) {
+      return [...new Set(lista.map(item => item[campo]).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+    }
+
+    function cargarOrganizacionesRegistro() {
+      const barrio = barrioFiltroRegistro.value;
+      const filtradas = barrio
+        ? organizaciones.filter(o => o.barrio === barrio)
+        : organizaciones;
+
+      organizacionSelectRegistro.innerHTML = '<option value="">Seleccione una organización</option>';
+      filtradas.forEach(org => {
+        const opt = document.createElement("option");
+        opt.value = org.folio;
+        opt.textContent = org.tipologia ? `${org.organizacion} — ${org.tipologia}` : org.organizacion;
+        organizacionSelectRegistro.appendChild(opt);
+      });
+
+      organizacionSeleccionada = null;
+      renderDatosOrganizacion();
+    }
+
+    function renderDatosOrganizacion() {
+      if (!organizacionSeleccionada) {
+        datosOrganizacion.innerHTML = `
+          <p><strong>Folio:</strong> —</p>
+          <p><strong>Organización:</strong> —</p>
+          <p><strong>Tipología:</strong> —</p>
+          <p><strong>Barrio:</strong> —</p>
+          <p><strong>Proyecto:</strong> —</p>
+        `;
+        return;
+      }
+
+      datosOrganizacion.innerHTML = `
+        <p><strong>Folio:</strong> ${organizacionSeleccionada.folio}</p>
+        <p><strong>Organización:</strong> ${organizacionSeleccionada.organizacion}</p>
+        <p><strong>RUT:</strong> ${organizacionSeleccionada.rut || "—"}</p>
+        <p><strong>Tipología:</strong> ${organizacionSeleccionada.tipologia || "—"}</p>
+        <p><strong>Barrio:</strong> ${organizacionSeleccionada.barrio || "—"}</p>
+        <p><strong>Proyecto:</strong> ${organizacionSeleccionada.proyecto || "—"}</p>
+      `;
+    }
+
+    function agregarPuntoPendiente(latlng) {
+      if (!organizacionSeleccionada) {
+        alert("Primero debe seleccionar una organización.");
+        return;
+      }
+
+      if (puntosPendientes.length >= 10) {
+        alert("Ya se alcanzó el máximo de 10 puntos para este proyecto.");
+        return;
+      }
+
+      const numero = puntosPendientes.length + 1;
+      const punto = {
+        id_local: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${numero}`,
+        ...organizacionSeleccionada,
+        punto_numero: numero,
+        latitud: Number(latlng.lat.toFixed(7)),
+        longitud: Number(latlng.lng.toFixed(7)),
+        fecha_registro: new Date().toISOString()
+      };
+
+      puntosPendientes.push(punto);
+
+      const marker = L.marker(latlng).addTo(mapRegistro)
+        .bindPopup(`
+          <strong>${punto.organizacion}</strong><br>
+          <span class="badge">Punto ${numero}</span><br>
+          <strong>Tipología:</strong> ${punto.tipologia || "—"}<br>
+          <strong>Barrio:</strong> ${punto.barrio || "—"}
+        `);
+      markersPendientes.push(marker);
+
+      renderTablaPendientes();
+    }
+
+    function renderTablaPendientes() {
+      contadorPuntos.textContent = puntosPendientes.length;
+
+      if (puntosPendientes.length === 0) {
+        tablaPuntosPendientes.innerHTML = '<tr><td class="fila-vacia" colspan="8">Aún no hay puntos pendientes.</td></tr>';
+        return;
+      }
+
+      tablaPuntosPendientes.innerHTML = puntosPendientes.map(p => `
+        <tr>
+          <td><span class="badge">${p.punto_numero}</span></td>
+          <td>${p.folio}</td>
+          <td>${p.organizacion}</td>
+          <td>${p.tipologia || ""}</td>
+          <td>${p.barrio || ""}</td>
+          <td>${p.proyecto || ""}</td>
+          <td>${p.latitud}</td>
+          <td>${p.longitud}</td>
+        </tr>
+      `).join("");
+    }
+
+    function eliminarUltimo() {
+      if (puntosPendientes.length === 0) return;
+      puntosPendientes.pop();
+      const marker = markersPendientes.pop();
+      if (marker) mapRegistro.removeLayer(marker);
+      renderTablaPendientes();
+    }
+
+    function limpiarPendientes() {
+      if (puntosPendientes.length === 0) return;
+      if (!confirm("¿Desea eliminar todos los puntos pendientes?")) return;
+      puntosPendientes = [];
+      markersPendientes.forEach(marker => mapRegistro.removeLayer(marker));
+      markersPendientes = [];
+      renderTablaPendientes();
+    }
+
+    async function guardar() {
+      if (puntosPendientes.length === 0) {
+        alert("No hay puntos pendientes para guardar.");
+        return;
+      }
+
+      if (!SCRIPT_URL) {
+        puntosRegistrados.push(...puntosPendientes);
+        limpiarPendientesSinConfirmar();
+        inicializarFiltrosRevision();
+        renderRevision();
+        mostrarEstado(estadoRegistro, "ok", "Modo demo: los puntos se agregaron temporalmente a la pestaña de revisión.");
+        return;
+      }
+
+      try {
+        mostrarEstado(estadoRegistro, "info", "Guardando puntos...");
+        document.getElementById("btnGuardar").disabled = true;
+
+        await fetch(SCRIPT_URL, {
+          method: "POST",
+          mode: "no-cors",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({ action: "guardar_puntos", puntos: puntosPendientes })
+        });
+
+        const cantidadGuardada = puntosPendientes.length;
+        puntosPendientes = [];
+        markersPendientes.forEach(marker => mapRegistro.removeLayer(marker));
+        markersPendientes = [];
+        renderTablaPendientes();
+
+        mostrarEstado(estadoRegistro, "ok", `Solicitud enviada. Se intentó guardar ${cantidadGuardada} punto(s). Actualizando revisión...`);
+
+        setTimeout(async () => {
+          await cargarPuntosRegistrados();
+          inicializarFiltrosRevision();
+          renderRevision();
+        }, 1200);
+
+      } catch (error) {
+        mostrarEstado(estadoRegistro, "error", "No se pudo enviar la solicitud de guardado. Revise la URL de Apps Script o la conexión.");
+      } finally {
+        document.getElementById("btnGuardar").disabled = false;
+      }
+    }
+
+    function limpiarPendientesSinConfirmar() {
+      puntosPendientes = [];
+      markersPendientes.forEach(marker => mapRegistro.removeLayer(marker));
+      markersPendientes = [];
+      renderTablaPendientes();
+    }
+
+    function renderRevision() {
+      markersRevision.forEach(marker => mapRevision.removeLayer(marker));
+      markersRevision = [];
+
+      const barrio = barrioFiltroRevision.value;
+      const tipologia = tipologiaFiltroRevision.value;
+      const organizacion = organizacionFiltroRevision.value;
+
+      const filtrados = puntosRegistrados.filter(p => {
+        return (!barrio || p.barrio === barrio)
+          && (!tipologia || p.tipologia === tipologia)
+          && (!organizacion || p.organizacion === organizacion);
+      });
+
+      const proyectosUnicos = new Set(filtrados.map(p => p.folio).filter(Boolean));
+      contadorRevision.textContent = filtrados.length;
+      contadorProyectosRevision.textContent = proyectosUnicos.size;
+
+      filtrados.forEach(p => {
+        if (!p.latitud || !p.longitud) return;
+        const marker = L.marker([Number(p.latitud), Number(p.longitud)]).addTo(mapRevision)
+          .bindPopup(`
+            <strong>${p.organizacion}</strong><br>
+            <span class="badge">Punto ${p.punto_numero || ""}</span><br>
+            <strong>Tipología:</strong> ${p.tipologia || "—"}<br>
+            <strong>Barrio:</strong> ${p.barrio || "—"}<br>
+            <strong>Folio:</strong> ${p.folio || "—"}
+          `);
+        markersRevision.push(marker);
+      });
+
+      renderTablaRegistrados(filtrados);
+    }
+
+    function renderTablaRegistrados(lista) {
+      if (lista.length === 0) {
+        tablaPuntosRegistrados.innerHTML = '<tr><td class="fila-vacia" colspan="9">No hay puntos para los filtros seleccionados.</td></tr>';
+        return;
+      }
+
+      tablaPuntosRegistrados.innerHTML = lista.map(p => `
+        <tr>
+          <td>${formatearFecha(p.fecha_registro)}</td>
+          <td><span class="badge">${p.punto_numero || ""}</span></td>
+          <td>${p.folio || ""}</td>
+          <td>${p.organizacion || ""}</td>
+          <td>${p.tipologia || ""}</td>
+          <td>${p.barrio || ""}</td>
+          <td>${p.proyecto || ""}</td>
+          <td>${p.latitud || ""}</td>
+          <td>${p.longitud || ""}</td>
+        </tr>
+      `).join("");
+    }
+
+    async function buscarDireccion(inputId, map, tipoMapa) {
+      const input = document.getElementById(inputId);
+      const texto = input.value.trim();
+      if (!texto) {
+        alert("Ingrese una dirección o intersección para buscar.");
+        return;
+      }
+
+      const query = `${texto}, Maipú, Región Metropolitana, Chile`;
+      const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=cl&q=${encodeURIComponent(query)}`;
+
+      try {
+        const res = await fetch(url, { headers: { "Accept": "application/json" } });
+        const data = await res.json();
+        if (!data.length) {
+          alert("No se encontró la dirección. Intente con calle, intersección o referencia más específica.");
+          return;
+        }
+
+        const latlng = [Number(data[0].lat), Number(data[0].lon)];
+        map.setView(latlng, 17);
+
+        if (tipoMapa === "registro") {
+          if (markerBusquedaRegistro) map.removeLayer(markerBusquedaRegistro);
+          markerBusquedaRegistro = L.marker(latlng).addTo(map).bindPopup(`Resultado de búsqueda:<br>${data[0].display_name}`).openPopup();
+        } else {
+          if (markerBusquedaRevision) map.removeLayer(markerBusquedaRevision);
+          markerBusquedaRevision = L.marker(latlng).addTo(map).bindPopup(`Resultado de búsqueda:<br>${data[0].display_name}`).openPopup();
+        }
+      } catch (error) {
+        alert("No se pudo realizar la búsqueda de dirección. Revise la conexión o intente nuevamente.");
+      }
+    }
+
+    function formatearFecha(valor) {
+      if (!valor) return "";
+      try {
+        return new Date(valor).toLocaleString("es-CL");
+      } catch {
+        return valor;
+      }
+    }
+
+    function mostrarEstado(elemento, tipo, mensaje) {
+      elemento.className = `estado ${tipo}`;
+      elemento.textContent = mensaje;
+    }
+
+    document.querySelectorAll(".tab-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+        document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
+        btn.classList.add("active");
+        document.getElementById(btn.dataset.tab).classList.add("active");
+        setTimeout(() => {
+          mapRegistro.invalidateSize();
+          mapRevision.invalidateSize();
+        }, 150);
+      });
+    });
+
+    barrioFiltroRegistro.addEventListener("change", cargarOrganizacionesRegistro);
+
+    organizacionSelectRegistro.addEventListener("change", () => {
+      organizacionSeleccionada = organizaciones.find(o => o.folio === organizacionSelectRegistro.value) || null;
+      renderDatosOrganizacion();
+    });
+
+    [barrioFiltroRevision, tipologiaFiltroRevision, organizacionFiltroRevision].forEach(select => {
+      select.addEventListener("change", renderRevision);
+    });
+
+    mapRegistro.on("click", e => agregarPuntoPendiente(e.latlng));
+
+    document.getElementById("btnEliminarUltimo").addEventListener("click", eliminarUltimo);
+    document.getElementById("btnLimpiar").addEventListener("click", limpiarPendientes);
+    document.getElementById("btnGuardar").addEventListener("click", guardar);
+    document.getElementById("btnCentrarRegistro").addEventListener("click", () => mapRegistro.setView(centroMaipu, zoomInicialMaipu));
+    document.getElementById("btnCentrarRevision").addEventListener("click", () => mapRevision.setView(centroMaipu, zoomInicialMaipu));
+    document.getElementById("btnBuscarRegistro").addEventListener("click", () => buscarDireccion("direccionRegistro", mapRegistro, "registro"));
+    document.getElementById("btnBuscarRevision").addEventListener("click", () => buscarDireccion("direccionRevision", mapRevision, "revision"));
+    document.getElementById("direccionRegistro").addEventListener("keydown", e => { if (e.key === "Enter") buscarDireccion("direccionRegistro", mapRegistro, "registro"); });
+    document.getElementById("direccionRevision").addEventListener("keydown", e => { if (e.key === "Enter") buscarDireccion("direccionRevision", mapRevision, "revision"); });
+    document.getElementById("btnActualizarRevision").addEventListener("click", async () => {
+      await cargarPuntosRegistrados();
+      inicializarFiltrosRevision();
+      renderRevision();
+      mapRevision.setView(centroMaipu, zoomInicialMaipu);
+    });
+
+    iniciarApp();
+  </script>
+</body>
+</html>
