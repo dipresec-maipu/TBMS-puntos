@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Registro de Puntos de Intervención TBMS 2026</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
   <style>
     :root {
       --azul: #252C54;
@@ -153,9 +154,23 @@
       display: none;
     }
 
-    .estado.ok { display: block; background: #e9f8f0; border-left: 5px solid var(--verde); }
-    .estado.error { display: block; background: #fdecef; border-left: 5px solid var(--magenta); }
-    .estado.info { display: block; background: #eef8fb; border-left: 5px solid var(--celeste); }
+    .estado.ok {
+      display: block;
+      background: #e9f8f0;
+      border-left: 5px solid var(--verde);
+    }
+
+    .estado.error {
+      display: block;
+      background: #fdecef;
+      border-left: 5px solid var(--magenta);
+    }
+
+    .estado.info {
+      display: block;
+      background: #eef8fb;
+      border-left: 5px solid var(--celeste);
+    }
 
     .botones {
       display: grid;
@@ -177,7 +192,11 @@
     .btn-alerta { background: var(--amarillo); color: #222; }
     .btn-gris { background: #e8e9ef; color: #222; }
     .btn-verde { background: var(--verde); color: white; }
-    button:disabled { opacity: 0.55; cursor: not-allowed; }
+
+    button:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
 
     .mapa-panel {
       display: grid;
@@ -255,6 +274,53 @@
       margin-top: 10px;
     }
 
+    .modal-guardando {
+      position: fixed;
+      inset: 0;
+      background: rgba(37, 44, 84, 0.55);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+    }
+
+    .modal-guardando.activo {
+      display: flex;
+    }
+
+    .modal-contenido {
+      background: white;
+      border-radius: 16px;
+      padding: 24px;
+      width: min(360px, 90vw);
+      text-align: center;
+      box-shadow: 0 10px 35px rgba(0, 0, 0, 0.25);
+    }
+
+    .spinner {
+      width: 42px;
+      height: 42px;
+      border: 5px solid #e8e9ef;
+      border-top: 5px solid var(--magenta);
+      border-radius: 50%;
+      margin: 0 auto 14px;
+      animation: girar 0.9s linear infinite;
+    }
+
+    @keyframes girar {
+      to { transform: rotate(360deg); }
+    }
+
+    .modal-contenido h3 {
+      margin: 0 0 8px;
+      color: var(--azul);
+    }
+
+    .modal-contenido p {
+      margin: 0;
+      font-size: 14px;
+    }
+
     @media (max-width: 900px) {
       .layout { grid-template-columns: 1fr; }
       .panel { max-height: none; }
@@ -266,6 +332,7 @@
     }
   </style>
 </head>
+
 <body>
   <header>
     <h1>Registro de Puntos de Intervención TBMS 2026</h1>
@@ -324,7 +391,9 @@
             <input id="direccionRegistro" type="text" placeholder="Buscar dirección o intersección en Maipú" />
             <button class="btn-secundario" id="btnBuscarRegistro">Buscar</button>
           </div>
+
           <div id="mapRegistro"></div>
+
           <div class="ayuda-mapa">
             Instrucción: seleccione una organización y luego haga clic en el mapa para agregar cada punto. Cada clic queda pendiente hasta presionar “Guardar”.
           </div>
@@ -399,7 +468,9 @@
             <input id="direccionRevision" type="text" placeholder="Buscar dirección o intersección en Maipú" />
             <button class="btn-secundario" id="btnBuscarRevision">Buscar</button>
           </div>
+
           <div id="mapRevision"></div>
+
           <div class="ayuda-mapa">
             Los puntos guardados se muestran en este mapa. Puede filtrar por barrio, tipología u organización.
           </div>
@@ -430,15 +501,17 @@
     </section>
   </main>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script>
-    /*
-      PASO OBLIGATORIO:
-      Pegue aquí la URL de la implementación web de Apps Script.
+  <div id="modalGuardando" class="modal-guardando">
+    <div class="modal-contenido">
+      <div class="spinner"></div>
+      <h3>Guardando puntos</h3>
+      <p>Por favor espere. No cierre esta ventana.</p>
+    </div>
+  </div>
 
-      Ejemplo:
-      const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyZzoJJ-5OtO4fA4N0xREezw6Bv_0Tby017ABxsiJ99dWbYZxHshaHNOMxELHGFeaUZ/exec";
-    */
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <script>
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyZzoJJ-5OtO4fA4N0xREezw6Bv_0Tby017ABxsiJ99dWbYZxHshaHNOMxELHGFeaUZ/exec";
 
     const BARRIOS_TBMS = [
@@ -548,6 +621,7 @@
         const callbackName = "jsonp_tbms_" + Date.now() + "_" + Math.floor(Math.random() * 100000);
         const script = document.createElement("script");
         const separador = SCRIPT_URL.includes("?") ? "&" : "?";
+
         script.src = `${SCRIPT_URL}${separador}mode=${encodeURIComponent(mode)}&callback=${callbackName}&_=${Date.now()}`;
 
         window[callbackName] = (data) => {
@@ -610,6 +684,18 @@
       })).filter(item => item.folio && item.organizacion);
     }
 
+    function parseCoordenada(valor) {
+      if (valor === null || valor === undefined || valor === "") return null;
+
+      const texto = String(valor)
+        .trim()
+        .replace(",", ".");
+
+      const numero = Number(texto);
+
+      return Number.isFinite(numero) ? numero : null;
+    }
+
     function normalizarPuntos(lista) {
       return lista.map(item => ({
         ...item,
@@ -619,8 +705,8 @@
         tipologia: normalizarTipologia(item.tipologia ?? item["Tipología"] ?? item.Tipologia ?? item.TIPOLOGIA ?? ""),
         proyecto: String(item.proyecto ?? item.Proyecto ?? item.PROYECTO ?? "").trim(),
         punto_numero: item.punto_numero ?? item.Punto ?? item["N°"] ?? item.numero ?? "",
-        latitud: Number(item.latitud ?? item.Latitud ?? item.LATITUD ?? 0),
-        longitud: Number(item.longitud ?? item.Longitud ?? item.LONGITUD ?? 0),
+        latitud: parseCoordenada(item.latitud ?? item.Latitud ?? item.LATITUD ?? ""),
+        longitud: parseCoordenada(item.longitud ?? item.Longitud ?? item.LONGITUD ?? ""),
         fecha_registro: item.fecha_registro ?? item.Fecha ?? item.FECHA ?? ""
       }));
     }
@@ -633,8 +719,12 @@
     function normalizarTipologia(valor) {
       const limpio = String(valor || "").trim();
       if (!limpio) return "";
+
       const upper = limpio.toUpperCase();
-      const encontrada = TIPOLOGIAS_TBMS.find(t => t.toUpperCase() === upper || t.toUpperCase().includes(upper));
+      const encontrada = TIPOLOGIAS_TBMS.find(t =>
+        t.toUpperCase() === upper || t.toUpperCase().includes(upper)
+      );
+
       return encontrada || limpio;
     }
 
@@ -645,21 +735,53 @@
     function inicializarFiltrosRevision() {
       llenarSelect(barrioFiltroRevision, BARRIOS_TBMS, "Todos los barrios");
       llenarSelect(tipologiaFiltroRevision, TIPOLOGIAS_TBMS, "Todas las tipologías");
-      llenarSelect(organizacionFiltroRevision, obtenerUnicos([...organizaciones, ...puntosRegistrados], "organizacion"), "Todas las organizaciones");
+      llenarSelect(
+        organizacionFiltroRevision,
+        obtenerUnicos([...organizaciones, ...puntosRegistrados], "organizacion"),
+        "Todas las organizaciones"
+      );
     }
 
     function llenarSelect(select, valores, placeholder) {
+      const valorActual = select.value;
+
       select.innerHTML = `<option value="">${placeholder}</option>`;
+
       valores.forEach(valor => {
         const opt = document.createElement("option");
         opt.value = valor;
         opt.textContent = valor;
         select.appendChild(opt);
       });
+
+      if ([...select.options].some(opt => opt.value === valorActual)) {
+        select.value = valorActual;
+      }
     }
 
     function obtenerUnicos(lista, campo) {
-      return [...new Set(lista.map(item => item[campo]).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+      return [...new Set(lista.map(item => item[campo]).filter(Boolean))]
+        .sort((a, b) => a.localeCompare(b));
+    }
+
+    function contarPuntosRegistradosPorFolio(folio) {
+      const folioLimpio = String(folio || "").trim();
+
+      return puntosRegistrados.filter(p =>
+        String(p.folio || "").trim() === folioLimpio
+      ).length;
+    }
+
+    function organizacionYaRegistrada(folio) {
+      return contarPuntosRegistradosPorFolio(folio) > 0;
+    }
+
+    function mostrarModalGuardando() {
+      document.getElementById("modalGuardando").classList.add("activo");
+    }
+
+    function ocultarModalGuardando() {
+      document.getElementById("modalGuardando").classList.remove("activo");
     }
 
     function cargarOrganizacionesRegistro() {
@@ -669,10 +791,16 @@
         : organizaciones;
 
       organizacionSelectRegistro.innerHTML = '<option value="">Seleccione una organización</option>';
+
       filtradas.forEach(org => {
         const opt = document.createElement("option");
         opt.value = org.folio;
         opt.textContent = org.tipologia ? `${org.organizacion} — ${org.tipologia}` : org.organizacion;
+
+        if (organizacionYaRegistrada(org.folio)) {
+          opt.textContent += " — YA REGISTRADA";
+        }
+
         organizacionSelectRegistro.appendChild(opt);
       });
 
@@ -692,6 +820,8 @@
         return;
       }
 
+      const cantidadRegistrada = contarPuntosRegistradosPorFolio(organizacionSeleccionada.folio);
+
       datosOrganizacion.innerHTML = `
         <p><strong>Folio:</strong> ${organizacionSeleccionada.folio}</p>
         <p><strong>Organización:</strong> ${organizacionSeleccionada.organizacion}</p>
@@ -699,6 +829,7 @@
         <p><strong>Tipología:</strong> ${organizacionSeleccionada.tipologia || "—"}</p>
         <p><strong>Barrio:</strong> ${organizacionSeleccionada.barrio || "—"}</p>
         <p><strong>Proyecto:</strong> ${organizacionSeleccionada.proyecto || "—"}</p>
+        <p><strong>Puntos ya registrados:</strong> ${cantidadRegistrada}</p>
       `;
     }
 
@@ -708,12 +839,24 @@
         return;
       }
 
+      if (organizacionYaRegistrada(organizacionSeleccionada.folio)) {
+        const cantidad = contarPuntosRegistradosPorFolio(organizacionSeleccionada.folio);
+        mostrarEstado(
+          estadoRegistro,
+          "error",
+          `Esta organización ya tiene ${cantidad} punto(s) registrado(s). Revise la pestaña “Revisar puntos registrados”.`
+        );
+        alert(`Esta organización ya tiene ${cantidad} punto(s) registrado(s). Para evitar duplicidad, no se permitirá ingresar nuevos puntos.`);
+        return;
+      }
+
       if (puntosPendientes.length >= 10) {
         alert("Ya se alcanzó el máximo de 10 puntos para este proyecto.");
         return;
       }
 
       const numero = puntosPendientes.length + 1;
+
       const punto = {
         id_local: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${numero}`,
         ...organizacionSeleccionada,
@@ -732,8 +875,8 @@
           <strong>Tipología:</strong> ${punto.tipologia || "—"}<br>
           <strong>Barrio:</strong> ${punto.barrio || "—"}
         `);
-      markersPendientes.push(marker);
 
+      markersPendientes.push(marker);
       renderTablaPendientes();
     }
 
@@ -761,15 +904,24 @@
 
     function eliminarUltimo() {
       if (puntosPendientes.length === 0) return;
+
       puntosPendientes.pop();
+
       const marker = markersPendientes.pop();
       if (marker) mapRegistro.removeLayer(marker);
+
       renderTablaPendientes();
     }
 
     function limpiarPendientes() {
       if (puntosPendientes.length === 0) return;
+
       if (!confirm("¿Desea eliminar todos los puntos pendientes?")) return;
+
+      limpiarPendientesSinConfirmar();
+    }
+
+    function limpiarPendientesSinConfirmar() {
       puntosPendientes = [];
       markersPendientes.forEach(marker => mapRegistro.removeLayer(marker));
       markersPendientes = [];
@@ -779,6 +931,13 @@
     async function guardar() {
       if (puntosPendientes.length === 0) {
         alert("No hay puntos pendientes para guardar.");
+        return;
+      }
+
+      if (organizacionSeleccionada && organizacionYaRegistrada(organizacionSeleccionada.folio)) {
+        const cantidad = contarPuntosRegistradosPorFolio(organizacionSeleccionada.folio);
+        mostrarEstado(estadoRegistro, "error", `No se guardó. Esta organización ya tiene ${cantidad} punto(s) registrado(s).`);
+        alert(`Esta organización ya tiene ${cantidad} punto(s) registrado(s). No se guardarán nuevos puntos para evitar duplicidad.`);
         return;
       }
 
@@ -792,6 +951,7 @@
       }
 
       try {
+        mostrarModalGuardando();
         mostrarEstado(estadoRegistro, "info", "Guardando puntos...");
         document.getElementById("btnGuardar").disabled = true;
 
@@ -799,35 +959,41 @@
           method: "POST",
           mode: "no-cors",
           headers: { "Content-Type": "text/plain;charset=utf-8" },
-          body: JSON.stringify({ action: "guardar_puntos", puntos: puntosPendientes })
+          body: JSON.stringify({
+            action: "guardar_puntos",
+            puntos: puntosPendientes
+          })
         });
 
         const cantidadGuardada = puntosPendientes.length;
-        puntosPendientes = [];
-        markersPendientes.forEach(marker => mapRegistro.removeLayer(marker));
-        markersPendientes = [];
-        renderTablaPendientes();
 
-        mostrarEstado(estadoRegistro, "ok", `Solicitud enviada. Se intentó guardar ${cantidadGuardada} punto(s). Actualizando revisión...`);
+        limpiarPendientesSinConfirmar();
+
+        mostrarEstado(
+          estadoRegistro,
+          "ok",
+          `Solicitud enviada. Se intentó guardar ${cantidadGuardada} punto(s). Actualizando revisión...`
+        );
 
         setTimeout(async () => {
           await cargarPuntosRegistrados();
           inicializarFiltrosRevision();
+          cargarOrganizacionesRegistro();
+          renderDatosOrganizacion();
           renderRevision();
-        }, 1200);
+          ocultarModalGuardando();
+          document.getElementById("btnGuardar").disabled = false;
+        }, 1800);
 
       } catch (error) {
-        mostrarEstado(estadoRegistro, "error", "No se pudo enviar la solicitud de guardado. Revise la URL de Apps Script o la conexión.");
-      } finally {
+        ocultarModalGuardando();
         document.getElementById("btnGuardar").disabled = false;
+        mostrarEstado(
+          estadoRegistro,
+          "error",
+          "No se pudo enviar la solicitud de guardado. Revise la URL de Apps Script o la conexión."
+        );
       }
-    }
-
-    function limpiarPendientesSinConfirmar() {
-      puntosPendientes = [];
-      markersPendientes.forEach(marker => mapRegistro.removeLayer(marker));
-      markersPendientes = [];
-      renderTablaPendientes();
     }
 
     function renderRevision() {
@@ -844,13 +1010,22 @@
           && (!organizacion || p.organizacion === organizacion);
       });
 
-      const proyectosUnicos = new Set(filtrados.map(p => p.folio).filter(Boolean));
-      contadorRevision.textContent = filtrados.length;
+      const filtradosConCoordenadas = filtrados.filter(p => {
+        const lat = parseCoordenada(p.latitud);
+        const lng = parseCoordenada(p.longitud);
+        return lat !== null && lng !== null;
+      });
+
+      const proyectosUnicos = new Set(filtradosConCoordenadas.map(p => p.folio).filter(Boolean));
+
+      contadorRevision.textContent = filtradosConCoordenadas.length;
       contadorProyectosRevision.textContent = proyectosUnicos.size;
 
-      filtrados.forEach(p => {
-        if (!p.latitud || !p.longitud) return;
-        const marker = L.marker([Number(p.latitud), Number(p.longitud)]).addTo(mapRevision)
+      filtradosConCoordenadas.forEach(p => {
+        const lat = parseCoordenada(p.latitud);
+        const lng = parseCoordenada(p.longitud);
+
+        const marker = L.marker([lat, lng]).addTo(mapRevision)
           .bindPopup(`
             <strong>${p.organizacion}</strong><br>
             <span class="badge">Punto ${p.punto_numero || ""}</span><br>
@@ -858,10 +1033,22 @@
             <strong>Barrio:</strong> ${p.barrio || "—"}<br>
             <strong>Folio:</strong> ${p.folio || "—"}
           `);
+
         markersRevision.push(marker);
       });
 
       renderTablaRegistrados(filtrados);
+
+      setTimeout(() => {
+        mapRevision.invalidateSize();
+
+        if (markersRevision.length > 0) {
+          const grupo = L.featureGroup(markersRevision);
+          mapRevision.fitBounds(grupo.getBounds().pad(0.2));
+        } else {
+          mapRevision.setView(centroMaipu, zoomInicialMaipu);
+        }
+      }, 200);
     }
 
     function renderTablaRegistrados(lista) {
@@ -879,8 +1066,8 @@
           <td>${p.tipologia || ""}</td>
           <td>${p.barrio || ""}</td>
           <td>${p.proyecto || ""}</td>
-          <td>${p.latitud || ""}</td>
-          <td>${p.longitud || ""}</td>
+          <td>${p.latitud ?? ""}</td>
+          <td>${p.longitud ?? ""}</td>
         </tr>
       `).join("");
     }
@@ -888,6 +1075,7 @@
     async function buscarDireccion(inputId, map, tipoMapa) {
       const input = document.getElementById(inputId);
       const texto = input.value.trim();
+
       if (!texto) {
         alert("Ingrese una dirección o intersección para buscar.");
         return;
@@ -897,8 +1085,12 @@
       const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=cl&q=${encodeURIComponent(query)}`;
 
       try {
-        const res = await fetch(url, { headers: { "Accept": "application/json" } });
+        const res = await fetch(url, {
+          headers: { "Accept": "application/json" }
+        });
+
         const data = await res.json();
+
         if (!data.length) {
           alert("No se encontró la dirección. Intente con calle, intersección o referencia más específica.");
           return;
@@ -909,10 +1101,18 @@
 
         if (tipoMapa === "registro") {
           if (markerBusquedaRegistro) map.removeLayer(markerBusquedaRegistro);
-          markerBusquedaRegistro = L.marker(latlng).addTo(map).bindPopup(`Resultado de búsqueda:<br>${data[0].display_name}`).openPopup();
+
+          markerBusquedaRegistro = L.marker(latlng)
+            .addTo(map)
+            .bindPopup(`Resultado de búsqueda:<br>${data[0].display_name}`)
+            .openPopup();
         } else {
           if (markerBusquedaRevision) map.removeLayer(markerBusquedaRevision);
-          markerBusquedaRevision = L.marker(latlng).addTo(map).bindPopup(`Resultado de búsqueda:<br>${data[0].display_name}`).openPopup();
+
+          markerBusquedaRevision = L.marker(latlng)
+            .addTo(map)
+            .bindPopup(`Resultado de búsqueda:<br>${data[0].display_name}`)
+            .openPopup();
         }
       } catch (error) {
         alert("No se pudo realizar la búsqueda de dirección. Revise la conexión o intente nuevamente.");
@@ -921,6 +1121,7 @@
 
     function formatearFecha(valor) {
       if (!valor) return "";
+
       try {
         return new Date(valor).toLocaleString("es-CL");
       } catch {
@@ -937,11 +1138,17 @@
       btn.addEventListener("click", () => {
         document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
         document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
+
         btn.classList.add("active");
         document.getElementById(btn.dataset.tab).classList.add("active");
+
         setTimeout(() => {
           mapRegistro.invalidateSize();
           mapRevision.invalidateSize();
+
+          if (btn.dataset.tab === "revisar") {
+            renderRevision();
+          }
         }, 150);
       });
     });
@@ -951,6 +1158,24 @@
     organizacionSelectRegistro.addEventListener("change", () => {
       organizacionSeleccionada = organizaciones.find(o => o.folio === organizacionSelectRegistro.value) || null;
       renderDatosOrganizacion();
+
+      if (!organizacionSeleccionada) return;
+
+      const cantidad = contarPuntosRegistradosPorFolio(organizacionSeleccionada.folio);
+
+      if (cantidad > 0) {
+        mostrarEstado(
+          estadoRegistro,
+          "error",
+          `Esta organización ya tiene ${cantidad} punto(s) registrado(s). No se permitirá duplicar el ingreso.`
+        );
+      } else {
+        mostrarEstado(
+          estadoRegistro,
+          "ok",
+          "Organización disponible para registrar puntos."
+        );
+      }
     });
 
     [barrioFiltroRevision, tipologiaFiltroRevision, organizacionFiltroRevision].forEach(select => {
@@ -962,17 +1187,35 @@
     document.getElementById("btnEliminarUltimo").addEventListener("click", eliminarUltimo);
     document.getElementById("btnLimpiar").addEventListener("click", limpiarPendientes);
     document.getElementById("btnGuardar").addEventListener("click", guardar);
-    document.getElementById("btnCentrarRegistro").addEventListener("click", () => mapRegistro.setView(centroMaipu, zoomInicialMaipu));
-    document.getElementById("btnCentrarRevision").addEventListener("click", () => mapRevision.setView(centroMaipu, zoomInicialMaipu));
-    document.getElementById("btnBuscarRegistro").addEventListener("click", () => buscarDireccion("direccionRegistro", mapRegistro, "registro"));
-    document.getElementById("btnBuscarRevision").addEventListener("click", () => buscarDireccion("direccionRevision", mapRevision, "revision"));
-    document.getElementById("direccionRegistro").addEventListener("keydown", e => { if (e.key === "Enter") buscarDireccion("direccionRegistro", mapRegistro, "registro"); });
-    document.getElementById("direccionRevision").addEventListener("keydown", e => { if (e.key === "Enter") buscarDireccion("direccionRevision", mapRevision, "revision"); });
+
+    document.getElementById("btnCentrarRegistro").addEventListener("click", () => {
+      mapRegistro.setView(centroMaipu, zoomInicialMaipu);
+    });
+
+    document.getElementById("btnCentrarRevision").addEventListener("click", () => {
+      mapRevision.setView(centroMaipu, zoomInicialMaipu);
+    });
+
+    document.getElementById("btnBuscarRegistro").addEventListener("click", () => {
+      buscarDireccion("direccionRegistro", mapRegistro, "registro");
+    });
+
+    document.getElementById("btnBuscarRevision").addEventListener("click", () => {
+      buscarDireccion("direccionRevision", mapRevision, "revision");
+    });
+
+    document.getElementById("direccionRegistro").addEventListener("keydown", e => {
+      if (e.key === "Enter") buscarDireccion("direccionRegistro", mapRegistro, "registro");
+    });
+
+    document.getElementById("direccionRevision").addEventListener("keydown", e => {
+      if (e.key === "Enter") buscarDireccion("direccionRevision", mapRevision, "revision");
+    });
+
     document.getElementById("btnActualizarRevision").addEventListener("click", async () => {
       await cargarPuntosRegistrados();
       inicializarFiltrosRevision();
       renderRevision();
-      mapRevision.setView(centroMaipu, zoomInicialMaipu);
     });
 
     iniciarApp();
